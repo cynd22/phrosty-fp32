@@ -25,24 +25,36 @@ import fitsio
 # Imports INTERNAL
 import phrosty
 from phrosty.imagesubtraction import sky_subtract, stampmaker
-# SFFT backend selection. Set env SFFT_BACKEND=lowmem|lowmem4088|rfft to use the
-# single-precision / low-memory fork (fits 4088^2 on an 8 GB consumer GPU). Default
-# keeps the stock float64 path.
-import os as _os
-_sfft_backend = _os.environ.get('SFFT_BACKEND', '').lower()
-if _sfft_backend in ('lowmem', 'lowmem4088', 'rfft'):
+# SFFT backend.  The stock float64 path is the default and is imported here so it
+# is always available (and serves as the type reference below).  The single-
+# precision / low-memory fork is opt-in via the --fp32 CLI flag or SFFT_BACKEND
+# env var, and is resolved at call time (see _resolve_sfft_backend) rather than at
+# import so the runtime flag can take effect.
+from sfft.SpaceSFFTCupyFlow import SpaceSFFT_CupyFlow
+
+
+def _resolve_sfft_backend():
+    """Return the SpaceSFFT flow class for the configured backend.
+
+    ``SFFT_BACKEND`` in {lowmem, lowmem4088, rfft} selects the single-precision /
+    low-memory fork (fits 4088^2 in ~8 GB of VRAM; faster, lower memory); anything
+    else returns the stock float64 ``SpaceSFFT_CupyFlow``.  Opt-in, default stock.
+    """
+    import os as _os
+    backend = _os.environ.get('SFFT_BACKEND', '').lower()
+    if backend not in ('lowmem', 'lowmem4088', 'rfft'):
+        return SpaceSFFT_CupyFlow
     import sys as _sys
     _eng = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', 'sfft_lowmem')
     if _eng not in _sys.path:
         _sys.path.insert(0, _eng)
-    if _sfft_backend == 'rfft':
-        from sfft_lowmem_rfft import SpaceSFFT_CupyFlow_LowMem_rfft as SpaceSFFT_CupyFlow
-    elif _sfft_backend == 'lowmem4088':
-        from sfft_lowmem_4088 import SpaceSFFT_CupyFlow_LowMem_4088 as SpaceSFFT_CupyFlow
+    if backend == 'rfft':
+        from sfft_lowmem_rfft import SpaceSFFT_CupyFlow_LowMem_rfft as cls
+    elif backend == 'lowmem4088':
+        from sfft_lowmem_4088 import SpaceSFFT_CupyFlow_LowMem_4088 as cls
     else:
-        from sfft_lowmem import SpaceSFFT_CupyFlow_LowMem as SpaceSFFT_CupyFlow
-else:
-    from sfft.SpaceSFFTCupyFlow import SpaceSFFT_CupyFlow
+        from sfft_lowmem import SpaceSFFT_CupyFlow_LowMem as cls
+    return cls
 from snappl.dbclient import SNPITDBClient
 from snappl.diaobject import DiaObject
 from snappl.imagecollection import ImageCollection
@@ -512,7 +524,7 @@ class Pipeline:
         sci_detmask = cp.array( np.ascontiguousarray( sci_image.detmask_img.data.T ) )
         templ_detmask = cp.array( np.ascontiguousarray( templ_image.detmask_img.data.T ) )
 
-        sfftifier = SpaceSFFT_CupyFlow(
+        sfftifier = _resolve_sfft_backend()(
                                         hdr_target=hdr_sci,
                                         hdr_object=hdr_templ,
                                         target_skyrms=sci_image.skyrms,
@@ -1513,6 +1525,11 @@ def main():
                          help="Toggle failure collection. If true, pipeline does not \
                                cancel if one image fails. If false, pipeline crashes if \
                                one image fails (useful for debugging)." )
+    parser.add_argument( '--fp32', action='store_true', default=False,
+                         help="Use the single-precision / low-memory SFFT backend \
+                               (fits 4088^2 in ~8 GB VRAM; faster, lower memory). \
+                               Opt-in alongside the stock float64 default; \
+                               equivalent to setting SFFT_BACKEND=rfft." )
 
     # Object collections
     parser.add_argument( '-oc', '--object-collection', default='snpitdb',
@@ -1582,6 +1599,13 @@ def main():
 
     cfg.augment_argparse( parser )
     args = parser.parse_args( leftovers )
+
+    # --fp32 opts into the single-precision / low-memory SFFT backend (resolved at
+    #   call time in _resolve_sfft_backend). setdefault so an explicit SFFT_BACKEND
+    #   env var still wins; default leaves the stock float64 path untouched.
+    if args.fp32:
+        import os
+        os.environ.setdefault( 'SFFT_BACKEND', 'rfft' )
     cfg.parse_args( args )
 
     if args.base_path is None and args.image_collection == 'manual_fits':
