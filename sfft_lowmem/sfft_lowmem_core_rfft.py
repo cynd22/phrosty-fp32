@@ -48,11 +48,15 @@ from sfft_lowmem_core import SingleSFFTConfigure_Cupy_F32
 __author__ = "lowmem fork - phase B (rfft/chunked)"
 
 _FFT_PREC = os.environ.get('SFFT_FFT_PRECISION', 'c128').strip().lower()
+if _FFT_PREC not in ('c64', 'c128'):
+    raise ValueError(f"SFFT_FFT_PRECISION must be 'c64' or 'c128', got: {_FFT_PREC!r}")
 
 _CPX = np.complex64
 _FLT = np.float32
 _PRE = np.float64
-_PCPX = np.complex128 if _FFT_PREC == 'c128' else np.complex64
+# c64 is the validated-BROKEN solve-feeding path (docs/SFFT_FORK_VALIDATION.md);
+#   default and any unrecognized value already rejected above -> c128.
+_PCPX = np.complex64 if _FFT_PREC == 'c64' else np.complex128
 
 
 # Chunked FillLS_OMG: one i8j8 group at a time, reading a local Fij-plane

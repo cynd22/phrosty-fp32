@@ -3,8 +3,9 @@
 **Date:** 2026-06-21
 **Hardware:** RTX 2070 SUPER, 8 GB (~6.5 GB free)
 **Reference of truth:** STOCK float64 SFFT (Lei Hu's published `sfft` 1.6.4), never modified.
-**Fork files (fixed):** `src/sfft_lowmem_core.py`, `src/sfft_lowmem_core_4088.py`,
-`src/sfft_lowmem_core_rfft.py` (plus the thin `src/sfft_lowmem*.py` wrappers).
+**Fork files (fixed):** `sfft_lowmem_core.py`, `sfft_lowmem_core_4088.py`,
+`sfft_lowmem_core_rfft.py` (plus the thin `sfft_lowmem*.py` wrappers), all at the
+top level of `sfft_lowmem/`.
 
 ---
 

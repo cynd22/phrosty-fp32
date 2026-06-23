@@ -56,6 +56,8 @@ import cupyx.scipy.linalg as cpx_linalg
 # The final DIFF construction (Construct_FDIFF) always runs in c64 (it does
 # not feed the solve; its error is a pure precision tradeoff, ~f32 of sky).
 _FFT_PREC = os.environ.get('SFFT_FFT_PRECISION', 'c128').strip().lower()
+if _FFT_PREC not in ('c64', 'c128'):
+    raise ValueError(f"SFFT_FFT_PRECISION must be 'c64' or 'c128', got: {_FFT_PREC!r}")
 
 # Reuse the phase-2 configure (it already builds the f32 complex kernels;
 # we don't use the HadProd kernels here, but SSCC also builds SpatialCoor,
@@ -68,7 +70,7 @@ __author__ = "lowmem fork - phase A 4088"
 _CPX = np.complex64           # persistent stacks for the DIFF construction
 _FLT = np.float32
 _PRE = np.float64             # PROTECTED: real stacks that fill the linear system.
-_PCPX = np.complex128 if _FFT_PREC == 'c128' else np.complex64   # solve-feeding FFTs
+_PCPX = np.complex64 if _FFT_PREC == 'c64' else np.complex128   # solve-feeding FFTs (c64=BROKEN)
 
 
 class ElementalSFFTSubtract_PureCupy_F32_4088:

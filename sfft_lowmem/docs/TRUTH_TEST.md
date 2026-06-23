@@ -8,9 +8,8 @@ well-constrained peak within 4% of truth), and recovers SN-free epochs as zero (
 flux). The fork is bit-identical to stock float64 (see `SFFT_FORK_VALIDATION.md`); this test
 confirms the whole chain — fork + production PSF — lands on truth, at ~6 GB instead of ~28.
 
-Figures: `validation/truth_recovery_20172782.png` (recovered vs injected truth),
-`validation/truth_cutouts_20172782.png` (the SN rise→peak→fade in the difference images).
-Numbers: `validation/truth_recovery.csv`.
+The per-epoch recovered-vs-truth numbers cited below are reproduced by running the
+test described under "Reproduce" at the end of this doc.
 
 ---
 
@@ -82,5 +81,5 @@ Inputs are all in `photometry_test_data` (`ou2024/images/simple_model/Y106/`,
 `ou2024/truth/Y106/`); PSF from Zenodo 10.5281/zenodo.15609513. Science = the non-5934 Y106
 pointings vs template 5934, full-frame 4088², `SFFT_BACKEND=rfft`, `psf.type=A25ePSF`,
 `kerpolyorder=2`. The run writes a phrosty native-schema lightcurve `.pq` (our fork also
-fills `NEA`/`sky_rms`/`pix_x`/`pix_y`, which stock phrosty leaves NaN); the per-epoch
-recovered-vs-truth numbers are in `validation/truth_recovery.csv`.
+fills `NEA`/`sky_rms`/`pix_x`/`pix_y`, which stock phrosty leaves NaN); read the
+per-epoch recovered-vs-truth numbers from that lightcurve.

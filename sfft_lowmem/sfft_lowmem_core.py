@@ -12,18 +12,20 @@ What changes vs stock:
     the stock kernel source returned by SingleSFFTConfigure_Cupy.SSCC,
     then re-compiling with cp.RawModule.  No hand transcription -> no
     index bugs.
-  * The FillLS_* kernels keep `double LHMAT/RHb` (the protected linear
-    system, see below) but take their real `Pre*` operand as `float`.
+  * The FillLS_* kernels are left fully at stock double precision
+    (`double Pre*` -> `double LHMAT/RHb`): the protected linear system,
+    see below.
   * In ElementalSFFTSubtract:
         complex128 -> complex64   (HpOMG/HpGAM/HpPSI/HpPHI/HpTHE/HpDEL,
                                     PixA_FJ, SPixA_FIij/FTpq, Kab_*, FDIFF)
-        float32 for the real Pre* stacks and image inputs.
+        float32 for the image inputs; the real Pre* stacks stay float64
+        (the FullPrecision carve-out, see NOTE).
   * PROTECTED FULL-PRECISION CARVE-OUT (ferrotorch autocast policy):
     the LHMAT / RHb matrix fill and the lu_factor / lu_solve stay
     float64.  NEQ x NEQ is N-independent (~35 MB at DK=2), so this costs
     almost nothing and protects the numerically sensitive solve.  The
-    float32 Pre* accumulators are cast up to float64 at the matrix-fill
-    boundary (the FillLS kernels read `float Pre*`, write `double LHMAT`).
+    Pre* stacks are themselves kept in float64 (the FillLS_* kernels are
+    left at stock `double Pre*` -> `double LHMAT`; see the NOTE below).
 
 Peak-VRAM driver (the reason a flow-only f32 fork is NOT enough): the
 (FOMG=Fij^2, N, N) complex stack HpOMG and its (FOMG, N, N) real PreOMG
@@ -36,7 +38,6 @@ import time
 import numpy as np
 import cupy as cp
 import cupyx.scipy.linalg as cpx_linalg
-import re
 
 from sfft.sfftcore.SFFTConfigure import SingleSFFTConfigure_Cupy
 
@@ -68,7 +69,6 @@ _COMPLEX_KERNELS = {
 # on the cross-convolved (PSF-smoothed -> ill-conditioned) image pairs
 # that the real pipeline feeds; f64 Pre* fixes it while the complex
 # Hadamard FFT stacks stay complex64 (still a large memory win).
-_FILLLS_PRE = {}
 
 
 def _f32_complex_rewrite(code: str) -> str:
@@ -84,13 +84,6 @@ def _f32_complex_rewrite(code: str) -> str:
     # that feed make_cuDoubleComplex; keep them double for the literal but
     # make_cuFloatComplex(double,double) is fine (implicit narrowing).
     return code
-
-
-def _fillls_pre_to_float(code: str, prename: str) -> str:
-    """Change the real Pre* stack parameter from double[...] to float[...]."""
-    # match e.g. 'double PreOMG_GPU[...'   ->   'float PreOMG_GPU['
-    return re.sub(r'double\s+' + re.escape(prename),
-                  'float ' + prename, code)
 
 
 class _CaptureRawModule:
@@ -155,14 +148,10 @@ def SingleSFFTConfigure_Cupy_F32(NX, NY, KerHW, KerPolyOrder=2, BGPolyOrder=2,
         new_code = None
         if name in _COMPLEX_KERNELS:
             new_code = _f32_complex_rewrite(code)
-        elif name in _FILLLS_PRE:
-            new_code = _fillls_pre_to_float(code, _FILLLS_PRE[name])
         if new_code is not None and new_code != code:
-            # complex kernels keep translate_cucomplex=True; FillLS use False
-            translate = name in _COMPLEX_KERNELS
             SFFTModule_dict[name] = cp.RawModule(
                 code=new_code, backend=CUDA_COMPILER,
-                translate_cucomplex=translate)
+                translate_cucomplex=True)
 
     return SFFTConfig
 
@@ -183,8 +172,13 @@ _FLT = np.float32         # real working precision (image planes, phase factors)
 # persistent stacks, NOT a full c128 Hadamard block.  DEFAULT c128.
 # The subtract pass (Construct_FDIFF + twiddle) stays c64 -- it does not feed
 # the solve and its error is a pure ~f32-of-sky precision tradeoff.
-_PCPX = np.complex128 if os.environ.get('SFFT_FFT_PRECISION', 'c128').strip().lower() == 'c128' \
-        else np.complex64    # solve-feeding FFT precision (normalized: only c64 on explicit downgrade)
+_FFT_PREC = os.environ.get('SFFT_FFT_PRECISION', 'c128').strip().lower()
+if _FFT_PREC not in ('c64', 'c128'):
+    raise ValueError(f"SFFT_FFT_PRECISION must be 'c64' or 'c128', got: {_FFT_PREC!r}")
+# solve-feeding FFT precision; c64 is the validated-BROKEN path (see
+#   docs/SFFT_FORK_VALIDATION.md), so an unrecognized value must fail loudly
+#   rather than silently downgrade to it.
+_PCPX = np.complex64 if _FFT_PREC == 'c64' else np.complex128
 _PRE = np.float64         # PROTECTED: real Pre* stacks that fill the linear
                           # system stay full float64 (FullPrecision carve-out).
 

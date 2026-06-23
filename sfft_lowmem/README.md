@@ -19,9 +19,8 @@ On the SN PIT's own test supernova (`20172782`), full-frame 4088², recovered fl
 **injected OpenUniverse truth within noise** (combined −1.3σ over the rise→peak→fall), using
 the published **A25ePSF** (Aldoroty 2025). The engine is **bit-identical to stock float64**
 on the difference image; the memory savings come from precision layout + a low-memory
-rewrite, not from changing the answer. See `docs/`.
-
-![truth recovery](validation/truth_recovery_20172782.png)
+rewrite, not from changing the answer. See `docs/SFFT_FORK_VALIDATION.md` and
+`docs/TRUTH_TEST.md` for the numbers.
 
 ## How it works (what actually changed)
 - **Precision layout, not blanket f32.** The ill-conditioned PSF-matching solve and the
@@ -35,9 +34,9 @@ rewrite, not from changing the answer. See `docs/`.
 - Net: full-frame 4088² peaks at **~6 GB** (vs ~28 GB f64), fits a clean 8 GB card.
 
 ## Use
-Drop-in replacement for `sfft.SpaceSFFTCupyFlow.SpaceSFFT_CupyFlow`. Put `src/` on
-`PYTHONPATH`, route phrosty with `SFFT_BACKEND=rfft`, run. Full steps: **`INTEGRATION.md`**.
-Off-cluster recipe (no container, no DB): **`docs/running-phrosty-locally.md`**.
+Drop-in replacement for `sfft.SpaceSFFTCupyFlow.SpaceSFFT_CupyFlow`. Put this
+directory (`sfft_lowmem/`) on `PYTHONPATH`, route phrosty with `SFFT_BACKEND=rfft`,
+run. Full steps: **`INTEGRATION.md`**.
 
 ## Precision contract & caveats
 - **Validated == float64**: decorrelated difference matches stock f64 to <1e-4 of sky;
@@ -66,7 +65,7 @@ of that rework were AI-assisted; the kernels in particular warrant a careful hum
 before production use.
 
 **If this is useful to you — especially if it's merged or adapted upstream — a credit or
-citation back to this repo (`__REPO_URL__`) is appreciated.**
+citation back to this repo (https://github.com/cynd22/phrosty-fp32) is appreciated.**
 
 ## License
-MIT (see `LICENSE`), retaining SFFT's original MIT copyright. Author: `__AUTHOR__`.
+MIT (see `LICENSE`), retaining SFFT's original MIT copyright. Author: cynd22.

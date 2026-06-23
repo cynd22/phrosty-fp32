@@ -171,7 +171,7 @@ class SpaceSFFT_CupyFlow_LowMem:
         self.CUDA_COMPILER = CUDA_COMPILER
         self.CUDA_DEVICE_4SUBTRACT = CUDA_DEVICE_4SUBTRACT
         self.GAIN = GAIN
-        self.RANDOM_SEED = 10086
+        self.RANDOM_SEED = RANDOM_SEED
 
     def resampling_image_mask_psf(self):
         CR = Cupy_Resampling(RESAMP_METHOD="BILINEAR", VERBOSE_LEVEL=1)
