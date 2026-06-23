@@ -25,7 +25,24 @@ import fitsio
 # Imports INTERNAL
 import phrosty
 from phrosty.imagesubtraction import sky_subtract, stampmaker
-from sfft.SpaceSFFTCupyFlow import SpaceSFFT_CupyFlow
+# SFFT backend selection. Set env SFFT_BACKEND=lowmem|lowmem4088|rfft to use the
+# single-precision / low-memory fork (fits 4088^2 on an 8 GB consumer GPU). Default
+# keeps the stock float64 path.
+import os as _os
+_sfft_backend = _os.environ.get('SFFT_BACKEND', '').lower()
+if _sfft_backend in ('lowmem', 'lowmem4088', 'rfft'):
+    import sys as _sys
+    _eng = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', 'sfft_lowmem')
+    if _eng not in _sys.path:
+        _sys.path.insert(0, _eng)
+    if _sfft_backend == 'rfft':
+        from sfft_lowmem_rfft import SpaceSFFT_CupyFlow_LowMem_rfft as SpaceSFFT_CupyFlow
+    elif _sfft_backend == 'lowmem4088':
+        from sfft_lowmem_4088 import SpaceSFFT_CupyFlow_LowMem_4088 as SpaceSFFT_CupyFlow
+    else:
+        from sfft_lowmem import SpaceSFFT_CupyFlow_LowMem as SpaceSFFT_CupyFlow
+else:
+    from sfft.SpaceSFFTCupyFlow import SpaceSFFT_CupyFlow
 from snappl.dbclient import SNPITDBClient
 from snappl.diaobject import DiaObject
 from snappl.imagecollection import ImageCollection
