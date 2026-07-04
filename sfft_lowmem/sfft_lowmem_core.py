@@ -111,6 +111,16 @@ def SingleSFFTConfigure_Cupy_F32(NX, NY, KerHW, KerPolyOrder=2, BGPolyOrder=2,
     call to harvest the kernel source, then re-compile the complex
     kernels in single precision and the FillLS kernels with float Pre*.
     """
+    # The rfft core's subtract/accumulate kernels use fixed FIloc[16] stack
+    # arrays indexed by Fij = (p+1)(p+2)/2; KerPolyOrder >= 5 gives Fij = 21
+    # and silent stack corruption. Config-space guard per the standing rule.
+    Fij = ((KerPolyOrder + 1) * (KerPolyOrder + 2)) // 2
+    if Fij > 16:
+        raise ValueError(
+            f"KerPolyOrder={KerPolyOrder} gives Fij={Fij} > 16: exceeds the "
+            "FIloc[16] kernel limit of this fork (sfft_lowmem_core_rfft.py). "
+            "Use KerPolyOrder <= 4 or the stock backend.")
+
     captured_sources = {}
     orig_rawmodule = cp.RawModule
 

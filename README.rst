@@ -1,3 +1,33 @@
+fp32 / low-memory fork
+======================
+
+This fork of `Roman-Supernova-PIT/phrosty <https://github.com/Roman-Supernova-PIT/phrosty>`_
+adds an **opt-in fp32/low-memory SFFT backend** (``sfft_lowmem/``). Stock phrosty
+needs a 20 GB+ GPU; this backend runs the full-frame 4088² Roman SCA subtraction
+in **~5 GB of VRAM** (peak ~27 GB → ~5 GB), off-cluster, on an 8 GB consumer card.
+
+- **Enable:** ``SFFT_BACKEND=rfft`` in the environment (or the ``--fp32`` CLI
+  flag). **Defaults are untouched** — without the switch this fork behaves as
+  stock.
+- **Precision contract:** three deliberate f64 carve-outs (matching-kernel
+  solve, resampler, decorrelation); difference-image background faithful to
+  stock f64 to ~1e-5 of sky on real Roman inputs; bright-core f32 rounding
+  expected and reported separately. Requires sky-subtracted input. Proof and
+  refutation log: ``docs/SFFT_FORK_VALIDATION.md``; engine details:
+  ``sfft_lowmem/README.md``; wiring: ``sfft_lowmem/INTEGRATION.md``;
+  regression rules: ``validation/README.md`` (the standing rule).
+- **Intended role:** a validated *triage tier* — quick-look and off-cluster
+  difference imaging (candidate vetting, second-opinion re-subtraction,
+  student/small-group use) where anything interesting is re-run at full f64
+  on production hardware. Not a replacement for the production f64 path.
+
+Fork changes also include two small fixes submitted upstream
+(`#194 <https://github.com/Roman-Supernova-PIT/phrosty/pull/194>`_,
+`#195 <https://github.com/Roman-Supernova-PIT/phrosty/pull/195>`_).
+Upstream's own README follows below.
+
+----
+
 Difference imaging forced photometry pipeline
 =============================================
 
